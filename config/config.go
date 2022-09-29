@@ -3,28 +3,30 @@ package config
 import (
 	"github.com/spf13/viper"
 	"log"
+	"strings"
 )
 
 var globalConfig Config
 
 type Config struct {
 	App struct {
-		Name     string
-		Port     int
-		LogLevel string
-	}
+		Name     string `mapstructure:"name"`
+		Port     int    `mapstructure:"port"`
+		LogLevel string `mapstructure:"log_level"`
+	} `mapstructure:"app"`
 	RabbitMQ struct {
-		Host     string
-		Port     int
-		UserName string
-		Password string
-	}
+		Host     string `mapstructure:"host"`
+		Port     int    `mapstructure:"port"`
+		UserName string `mapstructure:"username"`
+		Password string `mapstructure:"password"`
+	} `mapstructure:"rmq"`
 }
 
 func LoadConfig() {
 	config := viper.New()
 	config.SetConfigName("app")
-	config.SetConfigType("env")
+	config.SetConfigType("yaml")
+	config.SetEnvKeyReplacer(strings.NewReplacer(".", "__"))
 	config.AutomaticEnv()
 
 	config.AddConfigPath("./config/")

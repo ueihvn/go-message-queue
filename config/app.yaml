@@ -1,0 +1,9 @@
+app:
+  log_level: DEBUG
+  name: go-message-queue
+  port: 3000
+rmq:
+  host: localhost
+  port: 5672
+  username: guest
+  password: guest
