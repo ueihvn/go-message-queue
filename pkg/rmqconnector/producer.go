@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/ueihvn/go-message-queue/pkg/utils"
 	"go.uber.org/zap"
 	"time"
 )
@@ -14,6 +15,12 @@ const (
 	TaskQueueProducer   = "task_queue"
 	PubSubQueueProducer = "pub_sub"
 	LogsExchange        = "logs"
+	LogsDirectExchange  = "logs_direct"
+	RoutingProduce      = "routing"
+)
+
+var (
+	routingKeys = []string{"error", "warn", "info", "debug", "trace"}
 )
 
 type rmqConnectorImp struct {
@@ -56,6 +63,8 @@ func (r *rmqConnectorImp) Produce(messageBody []byte) error {
 		return r.taskQueueProduce(messageBody)
 	case PubSubQueueProducer:
 		return r.pubSubProduce(messageBody)
+	case RoutingProduce:
+		return r.routingProduce(messageBody)
 	default:
 		return fmt.Errorf("rmqConnectorImp produceType: %v not implemented", r.produceType)
 	}
@@ -149,5 +158,37 @@ func (r *rmqConnectorImp) pubSubProduce(messageBody []byte) error {
 	); err != nil {
 		return fmt.Errorf("rmq produce message error: %w", err)
 	}
+	return nil
+}
+
+func (r *rmqConnectorImp) routingProduce(messageBody []byte) error {
+	if err := r.rmqChannel.ExchangeDeclare(
+		LogsDirectExchange,  // name
+		amqp.ExchangeDirect, // type
+		true,                // durable
+		false,               // auto-deleted
+		false,               // internal
+		false,               // no-wait
+		nil,                 // arguments
+	); err != nil {
+		return errors.Wrap(err, "declare exchange")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	routingKey := fmt.Sprint(routingKeys[utils.RandomIntN(len(routingKeys))])
+	if err := r.rmqChannel.PublishWithContext(
+		ctx,
+		LogsDirectExchange,
+		routingKey,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "text/plain",
+			Body:        messageBody,
+		},
+	); err != nil {
+		return fmt.Errorf("rmq produce message error: %w", err)
+	}
+	r.logger.Infof("produce message with key: %v", routingKey)
 	return nil
 }
